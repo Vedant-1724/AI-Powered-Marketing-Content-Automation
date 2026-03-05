@@ -2,3 +2,7 @@
 .env.example
 deploy.sh
 docker-compose
+.idea/
+target/
+node_modules/
+__pycache__/
