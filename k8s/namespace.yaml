@@ -1,0 +1,8 @@
+# MarkAI Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: markai
+  labels:
+    app.kubernetes.io/name: markai
+    app.kubernetes.io/part-of: markai-platform

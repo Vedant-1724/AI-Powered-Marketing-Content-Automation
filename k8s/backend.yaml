@@ -1,0 +1,131 @@
+# Spring Boot Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: markai
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: markai/backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: markai-config
+                  key: SPRING_PROFILES_ACTIVE
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/markai_db
+            - name: SPRING_DATASOURCE_USERNAME
+              value: markai_user
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: markai-secrets
+                  key: postgres-password
+            - name: SPRING_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: markai-config
+                  key: SPRING_REDIS_HOST
+            - name: SPRING_REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: markai-config
+                  key: SPRING_REDIS_PORT
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: markai-secrets
+                  key: jwt-secret
+            - name: AI_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: markai-config
+                  key: AI_SERVICE_URL
+            - name: RAZORPAY_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: markai-secrets
+                  key: razorpay-key-id
+            - name: RAZORPAY_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: markai-secrets
+                  key: razorpay-key-secret
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 500m
+            limits:
+              memory: 1Gi
+              cpu: '1'
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: markai
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: backend
+---
+# HPA — Auto-scale backend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: markai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
